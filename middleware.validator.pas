@@ -400,24 +400,31 @@ begin
 end;
 
 procedure TMiddleWareValidator.ValidateNumeric(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
+var
+  LDateJSONValue: TJSONValue;
 begin
   try
-    if AValue.config.FindValue('min') <> nil then
+    LDateJSONValue := (ABody as TJSONObject).GetValue(AValue.body);
+
+    if LDateJSONValue is TJSONNumber then
     begin
-      var LFieldValue := ABody.GetValue<Double>(AValue.body, 0);
-      var LFieldMinValue := AValue.config.GetValue<Double>('min', 0);
+      if AValue.config.FindValue('min') <> nil then
+      begin
+        var LFieldValue := ABody.GetValue<Double>(AValue.body, 0);
+        var LFieldMinValue := AValue.config.GetValue<Double>('min', 0);
 
-      if LFieldValue < LFieldMinValue then
-        Abort;
-    end;
+        if LFieldValue < LFieldMinValue then
+          Abort;
+      end;
 
-    if AValue.config.FindValue('max') <> nil then
-    begin
-      var LFieldValue := ABody.GetValue<Double>(AValue.body, 0);
-      var LFieldMaxValue := AValue.config.GetValue<Double>('max', 0);
+      if AValue.config.FindValue('max') <> nil then
+      begin
+        var LFieldValue := ABody.GetValue<Double>(AValue.body, 0);
+        var LFieldMaxValue := AValue.config.GetValue<Double>('max', 0);
 
-      if LFieldValue > LFieldMaxValue then
-        Abort;
+        if LFieldValue > LFieldMaxValue then
+          Abort;
+      end;
     end;
 
   except

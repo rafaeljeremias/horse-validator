@@ -153,9 +153,23 @@ function TMiddlewareValidatorItem.isDate(AValue: string): IMiddleWareValidatorIt
 begin
   result := Self;
 
-  FExists := True;
-  FMiddlewareValidatorItemType := mvtDate;
-  FConfigJSON := TJSONObject.ParseJSONValue(AValue) as TJSONObject;
+  if FMiddlewareValidatorItemType = mvtJSONArray then
+  begin
+    var LNumPairs := FListKeys.Count;
+
+    if LNumPairs > 0 then
+    begin
+      FListKeys[LNumPairs -1].exists(True);
+      FListKeys[LNumPairs -1].MiddlewareValidatorItemType(mvtDate);
+      FListKeys[LNumPairs -1].Config(TJSONObject.ParseJSONValue(AValue) as TJSONObject);
+    end;
+  end
+  else
+  begin
+    FExists := True;
+    FMiddlewareValidatorItemType := mvtDate;
+    FConfigJSON := TJSONObject.ParseJSONValue(AValue) as TJSONObject;
+  end;
 end;
 
 function TMiddlewareValidatorItem.isEmail: IMiddleWareValidatorItem;
@@ -221,9 +235,23 @@ function TMiddlewareValidatorItem.isNumeric(AValue: string): IMiddleWareValidato
 begin
   result := Self;
 
-  FExists := True;
-  FMiddlewareValidatorItemType := mvtNumeric;
-  FConfigJSON := TJSONObject.ParseJSONValue(AValue) as TJSONObject;
+  if FMiddlewareValidatorItemType = mvtJSONArray then
+  begin
+    var LNumPairs := FListKeys.Count;
+
+    if LNumPairs > 0 then
+    begin
+      FListKeys[LNumPairs -1].exists(True);
+      FListKeys[LNumPairs -1].MiddlewareValidatorItemType(mvtNumeric);
+      FListKeys[LNumPairs -1].Config(TJSONObject.ParseJSONValue(AValue) as TJSONObject);
+    end;
+  end
+  else
+  begin
+    FExists := True;
+    FMiddlewareValidatorItemType := mvtNumeric;
+    FConfigJSON := TJSONObject.ParseJSONValue(AValue) as TJSONObject;
+  end;
 end;
 
 function TMiddlewareValidatorItem.isString(AValue: string): IMiddleWareValidatorItem;
