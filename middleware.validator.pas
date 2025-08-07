@@ -9,6 +9,7 @@ uses
   Horse.Commons,
   System.StrUtils,
   System.SysUtils,
+  System.DateUtils,
   Generics.Collections,
   middleware.validator.item,
   middleware.validator.consts,
@@ -27,6 +28,7 @@ type
 
     procedure ValidateInt(AValue: IMiddleWareValidatorItem);
     procedure ValidateBody(AValue: IMiddleWareValidatorItem);
+    procedure ValidateDate(AValue: IMiddleWareValidatorItem);
     procedure ValidateString(AValue: IMiddleWareValidatorItem);
 
     function getExists: Boolean;
@@ -43,6 +45,7 @@ type
     function Execute: IMiddleWareValidator;
 
     function isInt(AValue: string): IMiddleWareValidatorItem;
+    function isDate(AValue: string): IMiddleWareValidatorItem;
     function isString(AValue: string): IMiddleWareValidatorItem;
     function exists(AValue: Boolean = true): IMiddlewareValidatorItem;
     function withMessage(AValue: string): IMiddlewareValidatorItem; overload;
@@ -108,6 +111,9 @@ begin
 
       if LValidatorItem.getType = mvtString then
         ValidateString(LValidatorItem);
+
+      if LValidatorItem.getType = mvtDate then
+        ValidateDate(LValidatorItem);
     end;
 
   except
@@ -139,6 +145,13 @@ begin
   result := FItems[FIndex].getType;
 end;
 
+function TMiddleWareValidator.isDate(AValue: string): IMiddleWareValidatorItem;
+begin
+  result := Self;
+
+  FItems[FIndex].isDate(AValue);
+end;
+
 function TMiddleWareValidator.isInt(AValue: string): IMiddleWareValidatorItem;
 begin
   result := Self;
@@ -166,6 +179,73 @@ begin
 
   if AValue.getExists <> LExiste then
     raise Exception.Create(AnsiReplaceStr(AValue.withMessage, '"', ''''));
+end;
+
+procedure TMiddleWareValidator.ValidateDate(AValue: IMiddleWareValidatorItem);
+var
+  LDateStr: string;
+  LDataMinField: TDateTime;
+  LDataMaxField: TDateTime;
+  LDataFieldBody: TDateTime;
+  LDateJSONValue: TJSONValue;
+  LFormatSettings: TFormatSettings;
+begin
+  try
+    LFormatSettings := TFormatSettings.Create;
+    LFormatSettings.DateSeparator := '-';
+    LFormatSettings.ShortDateFormat := 'yyyy-mm-dd';
+
+    if AValue.config.FindValue('min') <> nil then
+    begin
+      var LDateMinJSON := AValue.config.FindValue('min');
+
+      if LDateMinJSON is TJSONString then
+        LDateStr := TJSONString(LDateMinJSON).Value
+      else
+        LDateStr := StringReplace(LDateMinJSON.ToString, '"', '', [rfReplaceAll]);
+
+      LDataMinField := StrToDateTimeDef(LDateStr, 0, LFormatSettings);
+
+      LDateJSONValue := (FBody as TJSONObject).GetValue('dt_venda');
+
+      if LDateJSONValue is TJSONString then
+        LDateStr := TJSONString(LDateJSONValue).Value
+      else
+        LDateStr := StringReplace(LDateJSONValue.ToString, '"', '', [rfReplaceAll]);
+
+      LDataFieldBody := StrToDateTimeDef(LDateStr, 0, LFormatSettings);
+
+      if LDataFieldBody < LDataMinField then
+        Abort;
+    end;
+
+    if AValue.config.FindValue('max') <> nil then
+    begin
+      var LDateMaxJSON := AValue.config.FindValue('max');
+
+      if LDateMaxJSON is TJSONString then
+        LDateStr := TJSONString(LDateMaxJSON).Value
+      else
+        LDateStr := StringReplace(LDateMaxJSON.ToString, '"', '', [rfReplaceAll]);
+
+      LDataMaxField := StrToDateTimeDef(LDateStr, 0, LFormatSettings);
+
+      LDateJSONValue := (FBody as TJSONObject).GetValue('dt_venda');
+
+      if LDateJSONValue is TJSONString then
+        LDateStr := TJSONString(LDateJSONValue).Value
+      else
+        LDateStr := StringReplace(LDateJSONValue.ToString, '"', '', [rfReplaceAll]);
+
+      LDataFieldBody := StrToDateTimeDef(LDateStr, 0, LFormatSettings);
+
+      if LDataFieldBody > LDataMaxField then
+        Abort;
+    end;
+
+  except
+    raise Exception.Create(AnsiReplaceStr(AValue.withMessage +' - Data deve ser no formato "YYYY-MM-DD HH:NN:SS"', '"', ''''));
+  end;
 end;
 
 procedure TMiddleWareValidator.ValidateInt(AValue: IMiddleWareValidatorItem);

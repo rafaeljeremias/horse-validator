@@ -27,6 +27,7 @@ type
     class function body(AValue: string): IMiddlewareValidatorItem; overload;
 
     function isInt(AValue: string): IMiddleWareValidatorItem;
+    function isDate(AValue: string): IMiddleWareValidatorItem;
     function isString(AValue: string): IMiddleWareValidatorItem;
     function exists(AValue: Boolean): IMiddlewareValidatorItem; overload;
     function withMessage(AValue: string): IMiddlewareValidatorItem; overload;
@@ -82,6 +83,15 @@ end;
 function TMiddlewareValidatorItem.getType: TMiddlewareValidatorItemType;
 begin
   result := FMiddlewareValidatorItemType;
+end;
+
+function TMiddlewareValidatorItem.isDate(AValue: string): IMiddleWareValidatorItem;
+begin
+  result := Self;
+
+  FExists := True;
+  FMiddlewareValidatorItemType := mvtDate;
+  FConfigJSON := TJSONObject.ParseJSONValue(AValue) as TJSONObject;
 end;
 
 function TMiddlewareValidatorItem.isInt(AValue: string): IMiddleWareValidatorItem;
