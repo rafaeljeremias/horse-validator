@@ -280,6 +280,19 @@ begin
         Abort;
     end;
 
+    if AValue.config.FindValue('in') <> nil then
+    begin
+      var LMathValue := False;
+
+      var LArrayJSON := AValue.config.GetValue<TJSONArray>('in');
+      for var LItem in LArrayJSON do
+        if LItem.Value = FBody.GetValue<string>(AValue.body) then
+          LMathValue := True;
+
+      if not LMathValue then
+        Abort;
+    end;
+
   except
     raise Exception.Create(AnsiReplaceStr(AValue.withMessage, '"', ''''));
   end;
