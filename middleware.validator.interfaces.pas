@@ -6,7 +6,7 @@ uses
   System.JSON;
 
 type
-  TMiddleWareValidatorItemType = (mvtBody, mvtInt, mvtString, mvtDate);
+  TMiddleWareValidatorItemType = (mvtBody, mvtInt, mvtString, mvtDate, mvtNumeric);
 
   IMiddleWareValidatorItem = Interface
     ['{D1DFD2E7-2006-4388-B7C0-76D2AB095C9D}']
@@ -18,6 +18,7 @@ type
     function isInt(AValue: string): IMiddleWareValidatorItem;
     function isDate(AValue: string): IMiddleWareValidatorItem;
     function isString(AValue: string): IMiddleWareValidatorItem;
+    function isNumeric(AValue: string): IMiddleWareValidatorItem;
     function exists(AValue: Boolean = true): IMiddlewareValidatorItem;
     function withMessage(AValue: string): IMiddlewareValidatorItem; overload;
   End;

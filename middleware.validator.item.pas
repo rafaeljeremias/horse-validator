@@ -29,6 +29,7 @@ type
     function isInt(AValue: string): IMiddleWareValidatorItem;
     function isDate(AValue: string): IMiddleWareValidatorItem;
     function isString(AValue: string): IMiddleWareValidatorItem;
+    function isNumeric(AValue: string): IMiddleWareValidatorItem;
     function exists(AValue: Boolean): IMiddlewareValidatorItem; overload;
     function withMessage(AValue: string): IMiddlewareValidatorItem; overload;
   End;
@@ -100,6 +101,15 @@ begin
 
   FExists := True;
   FMiddlewareValidatorItemType := mvtInt;
+  FConfigJSON := TJSONObject.ParseJSONValue(AValue) as TJSONObject;
+end;
+
+function TMiddlewareValidatorItem.isNumeric(AValue: string): IMiddleWareValidatorItem;
+begin
+  result := Self;
+
+  FExists := True;
+  FMiddlewareValidatorItemType := mvtNumeric;
   FConfigJSON := TJSONObject.ParseJSONValue(AValue) as TJSONObject;
 end;
 

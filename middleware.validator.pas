@@ -30,6 +30,7 @@ type
     procedure ValidateBody(AValue: IMiddleWareValidatorItem);
     procedure ValidateDate(AValue: IMiddleWareValidatorItem);
     procedure ValidateString(AValue: IMiddleWareValidatorItem);
+    procedure ValidateNumeric(AValue: IMiddleWareValidatorItem);
 
     function getExists: Boolean;
     function config: TJSONValue;
@@ -47,6 +48,7 @@ type
     function isInt(AValue: string): IMiddleWareValidatorItem;
     function isDate(AValue: string): IMiddleWareValidatorItem;
     function isString(AValue: string): IMiddleWareValidatorItem;
+    function isNumeric(AValue: string): IMiddleWareValidatorItem;
     function exists(AValue: Boolean = true): IMiddlewareValidatorItem;
     function withMessage(AValue: string): IMiddlewareValidatorItem; overload;
   End;
@@ -114,6 +116,9 @@ begin
 
       if LValidatorItem.getType = mvtDate then
         ValidateDate(LValidatorItem);
+
+      if LValidatorItem.getType = mvtNumeric then
+        ValidateNumeric(LValidatorItem);
     end;
 
   except
@@ -157,6 +162,13 @@ begin
   result := Self;
 
   FItems[FIndex].isInt(AValue);
+end;
+
+function TMiddleWareValidator.isNumeric(AValue: string): IMiddleWareValidatorItem;
+begin
+  result := Self;
+
+  FItems[FIndex].isNumeric(AValue);
 end;
 
 function TMiddleWareValidator.isString(AValue: string): IMiddleWareValidatorItem;
@@ -259,6 +271,32 @@ begin
   end;
 end;
 
+procedure TMiddleWareValidator.ValidateNumeric(AValue: IMiddleWareValidatorItem);
+begin
+  try
+    if AValue.config.FindValue('min') <> nil then
+    begin
+      var LFieldValue := FBody.GetValue<Double>(AValue.body, 0);
+      var LFieldMinValue := AValue.config.GetValue<Double>('min', 0);
+
+      if LFieldValue < LFieldMinValue then
+        Abort;
+    end;
+
+    if AValue.config.FindValue('max') <> nil then
+    begin
+      var LFieldValue := FBody.GetValue<Double>(AValue.body, 0);
+      var LFieldMaxValue := AValue.config.GetValue<Double>('max', 0);
+
+      if LFieldValue > LFieldMaxValue then
+        Abort;
+    end;
+
+  except
+    raise Exception.Create(AnsiReplaceStr(AValue.withMessage, '"', ''''));
+  end;
+end;
+
 procedure TMiddleWareValidator.ValidateString(AValue: IMiddleWareValidatorItem);
 begin
   try
@@ -274,7 +312,7 @@ begin
     if AValue.config.FindValue('max') <> nil then
     begin
       var LFieldLength := Length(Trim(FBody.GetValue<string>(AValue.body)));
-      var LFieldMaxValue := AValue.config.GetValue<Integer>('min');
+      var LFieldMaxValue := AValue.config.GetValue<Integer>('max');
 
       if LFieldLength > LFieldMaxValue then
         Abort;
