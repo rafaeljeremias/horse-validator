@@ -11,6 +11,7 @@ uses
   System.SysUtils,
   System.DateUtils,
   Generics.Collections,
+  System.RegularExpressions,
   middleware.validator.item,
   middleware.validator.consts,
   middleware.validator.interfaces;
@@ -26,17 +27,22 @@ type
     FRes: THorseResponse;
     FItems: TList<IMiddleWareValidatorItem>;
 
-    procedure ValidateInt(AValue: IMiddleWareValidatorItem);
-    procedure ValidateBody(AValue: IMiddleWareValidatorItem);
-    procedure ValidateDate(AValue: IMiddleWareValidatorItem);
-    procedure ValidateString(AValue: IMiddleWareValidatorItem);
-    procedure ValidateNumeric(AValue: IMiddleWareValidatorItem);
+    procedure ValidateJSONArray(AValue: IMiddleWareValidatorItem);
+    procedure ValidateInt(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
+    procedure ValidateBody(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
+    procedure ValidateDate(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
+    procedure ValidateEmail(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
+    procedure ValidateString(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
+    procedure ValidateNumeric(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
 
+    function key: Boolean;
     function getExists: Boolean;
-    function config: TJSONValue;
     function body: string; overload;
+    function config: TJSONValue; overload;
     function withMessage: string; overload;
     function getType: TMiddlewareValidatorItemType;
+    function config(AValue: TJSONValue): IMiddleWareValidatorItem; overload;
+    function MiddlewareValidatorItemType(AValue: TMiddleWareValidatorItemType): IMiddleWareValidatorItem;
   public
     constructor Create(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     destructor Destroy; override;
@@ -45,6 +51,9 @@ type
     function body(AValue: string): IMiddleWareValidatorItem; overload;
     function Execute: IMiddleWareValidator;
 
+    function isEmail: IMiddleWareValidatorItem;
+    function jsonArray: IMiddleWareValidatorJSONArray;
+    function &EndJSONArray: IMiddleWareValidatorJSONArray;
     function isInt(AValue: string): IMiddleWareValidatorItem;
     function isDate(AValue: string): IMiddleWareValidatorItem;
     function isString(AValue: string): IMiddleWareValidatorItem;
@@ -61,9 +70,16 @@ function TMiddleWareValidator.body(AValue: string): IMiddleWareValidatorItem;
 begin
   result := Self;
 
-  FItems.Add(TMiddlewareValidatorItem.body(AValue));
+  FItems.Add(TMiddlewareValidatorItem.body(AValue, FReq, FRes, FNext));
 
   FIndex := FItems.Count -1;
+end;
+
+function TMiddleWareValidator.config(AValue: TJSONValue): IMiddleWareValidatorItem;
+begin
+  result := Self;
+
+  FItems[FIndex].config(AValue);
 end;
 
 function TMiddleWareValidator.config: TJSONValue;
@@ -94,6 +110,11 @@ begin
   inherited;
 end;
 
+function TMiddleWareValidator.EndJSONArray: IMiddleWareValidatorJSONArray;
+begin
+  result := FItems[FIndex].EndJSONArray;
+end;
+
 function TMiddleWareValidator.Execute: IMiddleWareValidator;
 var
   LValidatorItem: IMiddleWareValidatorItem;
@@ -106,19 +127,25 @@ begin
 
     for LValidatorItem in FItems do
     begin
-      ValidateBody(LValidatorItem);
+      ValidateBody(FBody, LValidatorItem);
 
       if LValidatorItem.getType = mvtInt then
-        ValidateInt(LValidatorItem);
+        ValidateInt(FBody, LValidatorItem);
 
       if LValidatorItem.getType = mvtString then
-        ValidateString(LValidatorItem);
+        ValidateString(FBody, LValidatorItem);
 
       if LValidatorItem.getType = mvtDate then
-        ValidateDate(LValidatorItem);
+        ValidateDate(FBody, LValidatorItem);
 
       if LValidatorItem.getType = mvtNumeric then
-        ValidateNumeric(LValidatorItem);
+        ValidateNumeric(FBody, LValidatorItem);
+
+      if LValidatorItem.getType = mvtEmail then
+        ValidateEmail(FBody, LValidatorItem);
+
+      if LValidatorItem.getType = mvtJSONArray then
+        ValidateJSONArray(LValidatorItem);
     end;
 
   except
@@ -157,11 +184,36 @@ begin
   FItems[FIndex].isDate(AValue);
 end;
 
+function TMiddleWareValidator.isEmail: IMiddleWareValidatorItem;
+begin
+  result := Self;
+
+  FItems[FIndex].isEmail;
+end;
+
 function TMiddleWareValidator.isInt(AValue: string): IMiddleWareValidatorItem;
 begin
   result := Self;
 
   FItems[FIndex].isInt(AValue);
+end;
+
+function TMiddleWareValidator.jsonArray: IMiddleWareValidatorJSONArray;
+begin
+  result := FItems[FIndex].jsonArray;
+end;
+
+function TMiddleWareValidator.key: Boolean;
+begin
+  result := FItems[FIndex].key;
+end;
+
+function TMiddleWareValidator.MiddlewareValidatorItemType(
+  AValue: TMiddleWareValidatorItemType): IMiddleWareValidatorItem;
+begin
+  result := Self;
+
+  FItems[FIndex].MiddlewareValidatorItemType(AValue);
 end;
 
 function TMiddleWareValidator.isNumeric(AValue: string): IMiddleWareValidatorItem;
@@ -183,17 +235,23 @@ begin
   result := Self.Create(Req, Res, Next);
 end;
 
-procedure TMiddleWareValidator.ValidateBody(AValue: IMiddleWareValidatorItem);
+procedure TMiddleWareValidator.ValidateBody(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
 var
   LExiste: Boolean;
 begin
-  LExiste := FBody.FindValue(AValue.body) <> nil;
+  LExiste := ABody.FindValue(AValue.body) <> nil;
 
+  if AValue.getType = mvtJSONArray then
+  begin
+    if not LExiste then
+      raise Exception.Create(AnsiReplaceStr( Format('JSONArray "%s" deve ser informado!', [AValue.body]), '"', ''''));
+  end
+  else
   if AValue.getExists <> LExiste then
     raise Exception.Create(AnsiReplaceStr(AValue.withMessage, '"', ''''));
 end;
 
-procedure TMiddleWareValidator.ValidateDate(AValue: IMiddleWareValidatorItem);
+procedure TMiddleWareValidator.ValidateDate(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
 var
   LDateStr: string;
   LDataMinField: TDateTime;
@@ -218,7 +276,7 @@ begin
 
       LDataMinField := StrToDateTimeDef(LDateStr, 0, LFormatSettings);
 
-      LDateJSONValue := (FBody as TJSONObject).GetValue('dt_venda');
+      LDateJSONValue := (ABody as TJSONObject).GetValue('dt_venda');
 
       if LDateJSONValue is TJSONString then
         LDateStr := TJSONString(LDateJSONValue).Value
@@ -242,7 +300,7 @@ begin
 
       LDataMaxField := StrToDateTimeDef(LDateStr, 0, LFormatSettings);
 
-      LDateJSONValue := (FBody as TJSONObject).GetValue('dt_venda');
+      LDateJSONValue := (ABody as TJSONObject).GetValue('dt_venda');
 
       if LDateJSONValue is TJSONString then
         LDateStr := TJSONString(LDateJSONValue).Value
@@ -260,23 +318,93 @@ begin
   end;
 end;
 
-procedure TMiddleWareValidator.ValidateInt(AValue: IMiddleWareValidatorItem);
+procedure TMiddleWareValidator.ValidateEmail(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
+const
+  EmailRegex = '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$';
+begin
+  try
+    if not TRegEx.IsMatch(ABody.GetValue<string>(AValue.body), EmailRegex, [roIgnoreCase]) then
+      Abort;
+  except
+    raise Exception.Create(AnsiReplaceStr(AValue.withMessage, '"', ''''));
+  end;
+end;
+
+procedure TMiddleWareValidator.ValidateInt(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
 begin
   try
     if AValue.config.FindValue('min') <> nil then
-      if FBody.GetValue<Integer>(AValue.body) < AValue.config.GetValue<Integer>('min') then
+      if ABody.GetValue<Integer>(AValue.body) < AValue.config.GetValue<Integer>('min') then
         Abort;
   except
     raise Exception.Create(AnsiReplaceStr(AValue.withMessage, '"', ''''));
   end;
 end;
 
-procedure TMiddleWareValidator.ValidateNumeric(AValue: IMiddleWareValidatorItem);
+procedure TMiddleWareValidator.ValidateJSONArray(AValue: IMiddleWareValidatorItem);
+var
+  LValorKey: string;
+  LNumberkeys: Integer;
+  LJSONValue: TJSONValue;
+  LJSONArray: TJSONArray;
+  LSubItem: IMiddleWareValidatorItem;
+begin
+  try
+    LJSONArray := FBody.GetValue<TJSONArray>(AValue.body);
+
+    LNumberkeys := AValue.jsonArray.Count;
+
+    if LNumberkeys > 0 then
+    begin
+      if LJSONArray.Count = 0 then
+        raise Exception.Create(Format('Nenhum item encontrado em "%s".', [AValue.body]));
+
+      for LJSONValue in LJSONArray do
+      begin
+        LValorKey := '';
+
+        for var X := 0 to Pred(LNumberkeys) do
+        begin
+          LSubItem := AValue.jsonArray.GetIndex(X);
+
+          ValidateBody(LJSONValue, LSubItem);
+
+          if LSubItem.Key then
+            LValorKey := LJSONValue.GetValue<string>(LSubItem.body);
+
+          if LSubItem.getType = mvtInt then
+            ValidateInt(LJSONValue, LSubItem);
+
+          if LSubItem.getType = mvtString then
+            ValidateString(LJSONValue, LSubItem);
+
+          if LSubItem.getType = mvtDate then
+            ValidateDate(LJSONValue, LSubItem);
+
+          if LSubItem.getType = mvtNumeric then
+            ValidateNumeric(LJSONValue, LSubItem);
+
+          if LSubItem.getType = mvtEmail then
+            ValidateEmail(LJSONValue, LSubItem);
+        end;
+      end;
+    end;
+
+  except
+    on e:Exception do
+    begin
+      raise Exception.Create(ifThen(Trim(LValorKey) <> '', Format('Key: %s - ', [LValorKey]), '') +
+         AnsiReplaceStr(E.message, '"', ''''));
+    end;
+  end;
+end;
+
+procedure TMiddleWareValidator.ValidateNumeric(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
 begin
   try
     if AValue.config.FindValue('min') <> nil then
     begin
-      var LFieldValue := FBody.GetValue<Double>(AValue.body, 0);
+      var LFieldValue := ABody.GetValue<Double>(AValue.body, 0);
       var LFieldMinValue := AValue.config.GetValue<Double>('min', 0);
 
       if LFieldValue < LFieldMinValue then
@@ -285,7 +413,7 @@ begin
 
     if AValue.config.FindValue('max') <> nil then
     begin
-      var LFieldValue := FBody.GetValue<Double>(AValue.body, 0);
+      var LFieldValue := ABody.GetValue<Double>(AValue.body, 0);
       var LFieldMaxValue := AValue.config.GetValue<Double>('max', 0);
 
       if LFieldValue > LFieldMaxValue then
@@ -297,12 +425,12 @@ begin
   end;
 end;
 
-procedure TMiddleWareValidator.ValidateString(AValue: IMiddleWareValidatorItem);
+procedure TMiddleWareValidator.ValidateString(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
 begin
   try
     if AValue.config.FindValue('min') <> nil then
     begin
-      var LFieldLength := Length(Trim(FBody.GetValue<string>(AValue.body)));
+      var LFieldLength := Length(Trim(ABody.GetValue<string>(AValue.body)));
       var LFieldMinValue := AValue.config.GetValue<Integer>('min');
 
       if LFieldLength < LFieldMinValue then
@@ -311,7 +439,7 @@ begin
 
     if AValue.config.FindValue('max') <> nil then
     begin
-      var LFieldLength := Length(Trim(FBody.GetValue<string>(AValue.body)));
+      var LFieldLength := Length(Trim(ABody.GetValue<string>(AValue.body)));
       var LFieldMaxValue := AValue.config.GetValue<Integer>('max');
 
       if LFieldLength > LFieldMaxValue then
@@ -324,7 +452,7 @@ begin
 
       var LArrayJSON := AValue.config.GetValue<TJSONArray>('in');
       for var LItem in LArrayJSON do
-        if LItem.Value = FBody.GetValue<string>(AValue.body) then
+        if LItem.Value = ABody.GetValue<string>(AValue.body) then
           LMathValue := True;
 
       if not LMathValue then
