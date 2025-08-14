@@ -7,6 +7,7 @@ uses
   System.JSON,
   Horse.Jhonson,
   Horse.Commons,
+  System.Classes,
   System.StrUtils,
   System.SysUtils,
   System.DateUtils,
@@ -26,6 +27,7 @@ type
     FReq: THorseRequest;
     FRes: THorseResponse;
     FItems: TList<IMiddleWareValidatorItem>;
+    FMiddleWareValidatorFormatter: TMiddleWareValidatorFormatter;
 
     procedure ValidateJSONArray(AValue: IMiddleWareValidatorItem);
     procedure ValidateInt(ABody: TJSONValue; AValue: IMiddleWareValidatorItem);
@@ -41,6 +43,7 @@ type
     function config: TJSONValue; overload;
     function withMessage: string; overload;
     function getType: TMiddlewareValidatorItemType;
+    function ConvertJSONKeysFormatter(AValue: TJSONValue): TJSONValue;
     function config(AValue: TJSONValue): IMiddleWareValidatorItem; overload;
     function MiddlewareValidatorItemType(AValue: TMiddleWareValidatorItemType): IMiddleWareValidatorItem;
   public
@@ -59,6 +62,7 @@ type
     function isString(AValue: string): IMiddleWareValidatorItem;
     function isNumeric(AValue: string): IMiddleWareValidatorItem;
     function exists(AValue: Boolean = true): IMiddlewareValidatorItem;
+    function MiddleWareValidatorFormatter(AValue: TMiddleWareValidatorFormatter): IMiddleWareValidator;
     function withMessage(AValue: string): IMiddlewareValidatorItem; overload;
   End;
 
@@ -99,8 +103,9 @@ begin
   FReq := Req;
   FRes := Res;
   FNext := Next;
+  FMiddleWareValidatorFormatter := mvfLowerCase;
   FItems := TList<IMiddleWareValidatorItem>.Create;
-  FBody := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
+  FBody := ConvertJSONKeysFormatter(TJSONObject.ParseJSONValue(Req.Body) as TJSONObject);
 end;
 
 destructor TMiddleWareValidator.Destroy;
@@ -206,6 +211,13 @@ end;
 function TMiddleWareValidator.key: Boolean;
 begin
   result := FItems[FIndex].key;
+end;
+
+function TMiddleWareValidator.MiddleWareValidatorFormatter(AValue: TMiddleWareValidatorFormatter): IMiddleWareValidator;
+begin
+  result := Self;
+
+  FMiddleWareValidatorFormatter := AValue;
 end;
 
 function TMiddleWareValidator.MiddlewareValidatorItemType(
@@ -481,6 +493,51 @@ begin
   result := Self;
 
   FItems[FIndex].withMessage(AValue);
+end;
+
+function TMiddleWareValidator.ConvertJSONKeysFormatter(aValue: TJSONValue): TJSONValue;
+
+  function ProcessJSONValue(Value: TJSONValue): TJSONValue;
+  var
+    i: Integer;
+    Pair: TJSONPair;
+    Obj: TJSONObject;
+    Arr: TJSONArray;
+    NewObj: TJSONObject;
+    NewArr: TJSONArray;
+  begin
+    if Value is TJSONObject then
+    begin
+      Obj := Value as TJSONObject;
+      NewObj := TJSONObject.Create;
+      for i := 0 to Obj.Count - 1 do
+      begin
+        Pair := Obj.Pairs[i];
+
+        if FMiddleWareValidatorFormatter = mvfLowerCase then
+          NewObj.AddPair(LowerCase(Pair.JsonString.Value), ProcessJSONValue(Pair.JsonValue))
+        else
+          NewObj.AddPair(UpperCase(Pair.JsonString.Value), ProcessJSONValue(Pair.JsonValue));
+      end;
+      Result := NewObj;
+    end
+    else if Value is TJSONArray then
+    begin
+      Arr := Value as TJSONArray;
+      NewArr := TJSONArray.Create;
+      for i := 0 to Arr.Count - 1 do
+        NewArr.AddElement(ProcessJSONValue(Arr.Items[i]));
+      Result := NewArr;
+    end
+    else
+    begin
+      // Para strings, números, booleanos, null etc.
+      Result := Value.Clone as TJSONValue;
+    end;
+  end;
+
+begin
+  Result := ProcessJSONValue(AValue);
 end;
 
 end.

@@ -6,6 +6,8 @@ uses
   System.JSON;
 
 type
+  TMiddleWareValidatorFormatter = (mvfUpperCase, mvfLowerCase);
+
   TMiddleWareValidatorItemType = (mvtBody, mvtInt, mvtString, mvtDate, mvtNumeric, mvtEmail, mvtJSONArray);
 
   IMiddleWareValidatorItem = Interface;
@@ -40,6 +42,7 @@ type
 
   IMiddleWareValidator = Interface
     ['{EE17012E-9172-409B-B026-5CD577789E5F}']
+    function MiddleWareValidatorFormatter(AValue: TMiddleWareValidatorFormatter): IMiddleWareValidator;
     function body(APairName: string): IMiddleWareValidatorItem;
     function Execute: IMiddleWareValidator;
   End;
